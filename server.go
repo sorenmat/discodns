@@ -5,6 +5,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/rcrowley/go-metrics"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -55,7 +56,8 @@ func (h *Handler) Handle(response dns.ResponseWriter, req *dns.Msg) {
 			msg.Ns = []dns.RR{&dns.TXT{header, []string{"Rejected query based on matched filters"}}}
 		} else {
 			h.acceptCounter.Inc(1)
-			msg = h.resolver.Lookup(req)
+			ip_addr := strings.Split(response.RemoteAddr().String(), ":")[0]
+			msg = h.resolver.Lookup(ip_addr, req)
 		}
 
 		if msg != nil {
@@ -93,7 +95,7 @@ func (s *Server) Run() {
 	udpRejectCounter := metrics.NewCounter()
 	metrics.Register("request.handler.udp.filter_rejects", udpRejectCounter)
 
-	resolver := Resolver{etcd: s.etcd, defaultTtl: s.defaultTtl}
+	resolver := Resolver{etcd: s.etcd, etcdPrefix: Options.DNSPrefix, defaultTtl: s.defaultTtl}
 	tcpDNShandler := &Handler{
 		resolver:       &resolver,
 		requestCounter: tcpRequestCounter,

@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 	"github.com/rcrowley/go-metrics"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -36,7 +38,7 @@ func (r *Resolver) GetFromStorage(key string) (nodes []*EtcdRecord, err error) {
 	counter.Inc(1)
 	debugMsg("Querying etcd for " + key)
 
-	response, err := r.etcd.Get(r.etcdPrefix+key, true, true)
+	response, err := r.etcd.Get(r.etcdPrefix + key, true, true)
 	if err != nil {
 		error_counter.Inc(1)
 		return
@@ -107,13 +109,13 @@ func (r *Resolver) GetFromStorage(key string) (nodes []*EtcdRecord, err error) {
 // Authority returns a dns.RR describing the know authority for the given
 // domain. It will recurse up the domain structure to find an SOA record that
 // matches.
-func (r *Resolver) Authority(domain string) (soa *dns.SOA) {
+func (r *Resolver) Authority(remote string, domain string) (soa *dns.SOA) {
 	tree := strings.Split(domain, ".")
 	for i, _ := range tree {
 		subdomain := strings.Join(tree[i:], ".")
 
 		// Check for an SOA entry
-		answers, err := r.LookupAnswersForType(subdomain, dns.TypeSOA)
+		answers, err := r.LookupAnswersForType(remote, subdomain, dns.TypeSOA)
 		if err != nil {
 			return
 		}
@@ -135,7 +137,7 @@ func (r *Resolver) Authority(domain string) (soa *dns.SOA) {
 // Lookup responds to DNS messages of type Query, with a dns message containing Answers.
 // In the event that the query's value+type yields no known records, this falls back to
 // querying the given nameservers instead.
-func (r *Resolver) Lookup(req *dns.Msg) (msg *dns.Msg) {
+func (r *Resolver) Lookup(remote string, req *dns.Msg) (msg *dns.Msg) {
 	q := req.Question[0]
 
 	msg = new(dns.Msg)
@@ -151,7 +153,7 @@ func (r *Resolver) Lookup(req *dns.Msg) (msg *dns.Msg) {
 	var eChan chan error
 
 	if q.Qclass == dns.ClassINET {
-		aChan, eChan = r.AnswerQuestion(q)
+		aChan, eChan = r.AnswerQuestion(remote, q)
 		answers, errors = gatherFromChannels(aChan, eChan)
 	}
 
@@ -168,7 +170,7 @@ func (r *Resolver) Lookup(req *dns.Msg) (msg *dns.Msg) {
 					Qtype:  q.Qtype,
 					Qclass: q.Qclass}
 
-				aChan, eChan = r.AnswerQuestion(question)
+				aChan, eChan = r.AnswerQuestion(remote, question)
 				answers, errors = gatherFromChannels(aChan, eChan)
 
 				errored = errored || len(errors) > 0
@@ -188,7 +190,7 @@ func (r *Resolver) Lookup(req *dns.Msg) (msg *dns.Msg) {
 		error_counter.Inc(1)
 		msg.SetRcode(req, dns.RcodeServerFailure)
 	} else if len(answers) == 0 {
-		soa := r.Authority(q.Name)
+		soa := r.Authority(remote, q.Name)
 		miss_counter.Inc(1)
 		msg.SetRcode(req, dns.RcodeNameError)
 		if soa != nil {
@@ -199,7 +201,11 @@ func (r *Resolver) Lookup(req *dns.Msg) (msg *dns.Msg) {
 	} else {
 		hit_counter.Inc(1)
 		for _, rr := range answers {
-			rr.Header().Name = q.Name
+			debugMsg("Header.Name: ", rr.Header().Name, " QName: ", q.Name)
+			if !strings.HasSuffix(rr.Header().Name, ".") {
+				rr.Header().Name = rr.Header().Name + "."
+
+			}
 			msg.Answer = append(msg.Answer, rr)
 		}
 	}
@@ -238,12 +244,12 @@ func gatherFromChannels(rrsIn chan dns.RR, errsIn chan error) (rrs []dns.RR, err
 // the way. The function will return immediately, and spawn off a bunch of goroutines
 // to do the work, when using this function one should use a WaitGroup to know when all work
 // has been completed.
-func (r *Resolver) AnswerQuestion(q dns.Question) (answers chan dns.RR, errors chan error) {
+func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan dns.RR, errors chan error) {
 	answers = make(chan dns.RR)
 	errors = make(chan error)
 
 	typeStr := strings.ToLower(dns.TypeToString[q.Qtype])
-	type_counter := metrics.GetOrRegisterCounter("resolver.answers.type."+typeStr, metrics.DefaultRegistry)
+	type_counter := metrics.GetOrRegisterCounter("resolver.answers.type." + typeStr, metrics.DefaultRegistry)
 	type_counter.Inc(1)
 
 	debugMsg("Answering question ", q)
@@ -261,7 +267,7 @@ func (r *Resolver) AnswerQuestion(q dns.Question) (answers chan dns.RR, errors c
 				defer func() { recover() }()
 				defer wg.Done()
 
-				results, err := r.LookupAnswersForType(q.Name, rrType)
+				results, err := r.LookupAnswersForType(remote, q.Name, rrType)
 				if err != nil {
 					errors <- err
 				} else {
@@ -277,7 +283,7 @@ func (r *Resolver) AnswerQuestion(q dns.Question) (answers chan dns.RR, errors c
 				close(answers)
 				close(errors)
 			}()
-			records, err := r.LookupAnswersForType(q.Name, q.Qtype)
+			records, err := r.LookupAnswersForType(remote, q.Name, q.Qtype)
 			if err != nil {
 				errors <- err
 			} else {
@@ -286,17 +292,13 @@ func (r *Resolver) AnswerQuestion(q dns.Question) (answers chan dns.RR, errors c
 						answers <- rr
 					}
 				} else {
-					cnames, err := r.LookupAnswersForType(q.Name, dns.TypeCNAME)
+					cnames, err := r.LookupAnswersForType(remote, q.Name, dns.TypeCNAME)
+					for _, n := range cnames {
+						answers <- n
+					}
+					debugMsg("CNames: ", cnames)
 					if err != nil {
 						errors <- err
-					} else {
-						if len(cnames) > 1 {
-							errors <- &RecordValueError{
-								Message:       "Multiple CNAME records is invalid",
-								AttemptedType: dns.TypeCNAME}
-						} else if len(cnames) > 0 {
-							answers <- cnames[0]
-						}
 					}
 				}
 			}
@@ -310,24 +312,109 @@ func (r *Resolver) AnswerQuestion(q dns.Question) (answers chan dns.RR, errors c
 	return answers, errors
 }
 
-func (r *Resolver) LookupAnswersForType(name string, rrType uint16) (answers []dns.RR, err error) {
-	name = strings.ToLower(name)
+const (
+	TIMEOUT time.Duration = 5 // seconds
+)
 
-	typeStr := dns.TypeToString[rrType]
-	nodes, err := r.GetFromStorage(nameToKey(name, "/."+typeStr))
+func localQuery(qname string, qtype uint16) (*dns.Msg, error) {
+	localm := new(dns.Msg)
+	localm.RecursionDesired = true
+	localm.Question = make([]dns.Question, 1)
 
+	localm.SetQuestion(qname, qtype)
+
+	client, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
-		if e, ok := err.(*etcd.EtcdError); ok {
-			if e.ErrorCode == 100 {
-				return answers, nil
+		log.Println(err)
+	} else {
+		for _, server := range client.Servers {
+
+			localc := new(dns.Client)
+			localc.ReadTimeout = TIMEOUT * 1e9
+			r, _, err := localc.Exchange(localm, server + ":53")
+			if r == nil || r.Rcode == dns.RcodeNameError || r.Rcode == dns.RcodeSuccess {
+				debugMsg("Found host via recursive name servers: ",r)
+				return r, err
 			}
 		}
 
-		return
+	}
+	return nil, errors.New("No name server to answer the question")
+}
+
+func getMatchingCIDR(remote string, zones map[string][]string) string {
+	if len(zones) > 0 {
+		for k, masks := range zones {
+			if len(masks) > 0 {
+				for _, mask := range masks {
+					debugMsg("Trying CIDR mask %v", mask)
+					_, cidrnet, err := net.ParseCIDR(mask)
+					if err != nil {
+						fmt.Errorf("Not able to parse CIDR %v", err)
+						panic(err)
+					}
+					myaddr := net.ParseIP(remote)
+					if cidrnet.Contains(myaddr) {
+						debugMsg("Found a CIDR match %v\n", cidrnet)
+						return k
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (r *Resolver) getZones() map[string][]string {
+	result := map[string][]string{}
+	response, err := r.etcd.Get(r.etcdPrefix + "/zones", true, true)
+	if err != nil {
+		return nil
+	}
+	for _, n := range response.Node.Nodes {
+		fmt.Println(n.Key, n.Value)
+		result[n.Key] = strings.Split(n.Value, ",")
+	}
+	return result
+}
+
+func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint16) (answers []dns.RR, errs error) {
+	var nodes []*EtcdRecord
+	var err error
+	name = strings.ToLower(name)
+
+	typeStr := dns.TypeToString[rrType]
+	debugMsg("LookupAnswersForType typeStr: ", typeStr)
+	mask := getMatchingCIDR(remote, r.getZones())
+	if mask != "" {
+		debugMsg("Trying with mask: ", mask)
+		//		 Replace / with # since we can't store / via REST
+		key := strings.Replace(mask, "/", "-", 1) + nameToKey(name, "/." + typeStr)
+		nodes, err = r.GetFromStorage(key)
 	}
 
-	answers = make([]dns.RR, len(nodes))
-	for i, node := range nodes {
+	if len(nodes) == 0 {
+		nodes, err = r.GetFromStorage(nameToKey(name, "/." + typeStr))
+	}
+
+	if err != nil && len(nodes) == 0 {
+		debugMsg("Trying local query: " + string(len(nodes)))
+		debugMsg("Trying local query")
+		message, localerr := localQuery(name, rrType)
+		if localerr != nil {
+			if e, ok := localerr.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					return answers, nil
+				}
+			}
+			return
+
+		}
+		for _, a := range message.Answer {
+			answers = append(answers, a)
+		}
+	}
+	for _, node := range nodes {
 
 		header := dns.RR_Header{Name: name, Class: dns.ClassINET, Rrtype: rrType, Ttl: node.ttl}
 		answer, err := converters[rrType](node.node, header)
@@ -336,11 +423,22 @@ func (r *Resolver) LookupAnswersForType(name string, rrType uint16) (answers []d
 			debugMsg("Error converting type: ", err)
 			return nil, err
 		}
+		answers = append(answers, answer)
+		if answer.Header().Rrtype == dns.TypeCNAME {
 
-		answers[i] = answer
+
+			//			debugMsg("Found a CNAME answer will resolv that to an ip: ", answer.Header().Header().Name)
+			debugMsg("Found a CNAME answer will resolv that to an ip: ", node.node.Value, )
+			ans, err := r.LookupAnswersForType(remote, node.node.Value, dns.TypeA)
+			debugMsg("Found a CNAME answer returned: ", ans)
+			if err != nil {
+				debugMsg("ERROR: ", err)
+				return nil, err
+			}
+			answers = append(answers, ans...)
+		}
 	}
-
-	return
+	return answers, nil
 }
 
 // nameToKey returns a string representing the etcd version of a domain, replacing dots with slashes
