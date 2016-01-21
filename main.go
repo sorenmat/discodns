@@ -30,8 +30,7 @@ var (
 		DefaultTtl       uint32   `short:"t" long:"default-ttl" description:"Default TTL to return on records without an explicit TTL" default:"300"`
 		Accept           []string `long:"accept" description:"Limit DNS queries to a set of domain:[type,...] pairs"`
 		Reject           []string `long:"reject" description:"Limit DNS queries to a set of domain:[type,...] pairs"`
-		Masks            []string `long:"masks" description:"mask[,mask] cidr masks" default:""`
-		DNSPrefix        string   `long:"ndsprefix" description:"dnsprefix prefix for the dns entries in etcd" default:"hosts"`
+		DNSPrefix        string   `long:"ndsprefix" description:"dnsprefix prefix for the dns entries in etcd" default:""`
 	}
 )
 

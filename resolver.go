@@ -26,6 +26,11 @@ type EtcdRecord struct {
 	ttl  uint32
 }
 
+const (
+	HOST_PREFIX               = "/hosts/"
+	TIMEOUT     time.Duration = 5 // seconds
+)
+
 // GetFromStorage looks up a key in etcd and returns a slice of nodes. It supports two storage structures;
 //  - File:         /foo/bar/.A -> "value"
 //  - Directory:    /foo/bar/.A/0 -> "value-0"
@@ -37,8 +42,7 @@ func (r *Resolver) GetFromStorage(key string) (nodes []*EtcdRecord, err error) {
 
 	counter.Inc(1)
 	debugMsg("Querying etcd for " + key)
-
-	response, err := r.etcd.Get(r.etcdPrefix + key, true, true)
+	response, err := r.etcd.Get(r.etcdPrefix+HOST_PREFIX+key, true, true)
 	if err != nil {
 		error_counter.Inc(1)
 		return
@@ -249,7 +253,7 @@ func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan d
 	errors = make(chan error)
 
 	typeStr := strings.ToLower(dns.TypeToString[q.Qtype])
-	type_counter := metrics.GetOrRegisterCounter("resolver.answers.type." + typeStr, metrics.DefaultRegistry)
+	type_counter := metrics.GetOrRegisterCounter("resolver.answers.type."+typeStr, metrics.DefaultRegistry)
 	type_counter.Inc(1)
 
 	debugMsg("Answering question ", q)
@@ -312,10 +316,6 @@ func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan d
 	return answers, errors
 }
 
-const (
-	TIMEOUT time.Duration = 5 // seconds
-)
-
 func localQuery(qname string, qtype uint16) (*dns.Msg, error) {
 	localm := new(dns.Msg)
 	localm.RecursionDesired = true
@@ -331,9 +331,9 @@ func localQuery(qname string, qtype uint16) (*dns.Msg, error) {
 
 			localc := new(dns.Client)
 			localc.ReadTimeout = TIMEOUT * 1e9
-			r, _, err := localc.Exchange(localm, server + ":53")
+			r, _, err := localc.Exchange(localm, server+":53")
 			if r == nil || r.Rcode == dns.RcodeNameError || r.Rcode == dns.RcodeSuccess {
-				debugMsg("Found host via recursive name servers: ",r)
+				debugMsg("Found host via recursive name servers: ", r)
 				return r, err
 			}
 		}
@@ -342,21 +342,27 @@ func localQuery(qname string, qtype uint16) (*dns.Msg, error) {
 	return nil, errors.New("No name server to answer the question")
 }
 
+func stripZoneFromMask(mask string) string {
+	return strings.Replace(mask, "/zones", "", 1)
+}
+
 func getMatchingCIDR(remote string, zones map[string][]string) string {
 	if len(zones) > 0 {
 		for k, masks := range zones {
 			if len(masks) > 0 {
 				for _, mask := range masks {
 					debugMsg("Trying CIDR mask %v", mask)
-					_, cidrnet, err := net.ParseCIDR(mask)
-					if err != nil {
-						fmt.Errorf("Not able to parse CIDR %v", err)
-						panic(err)
-					}
-					myaddr := net.ParseIP(remote)
-					if cidrnet.Contains(myaddr) {
-						debugMsg("Found a CIDR match %v\n", cidrnet)
-						return k
+					if mask != "" {
+						_, cidrnet, err := net.ParseCIDR(mask)
+						if err != nil {
+							fmt.Errorf("Not able to parse CIDR %v", err)
+							panic(err)
+						}
+						myaddr := net.ParseIP(remote)
+						if cidrnet.Contains(myaddr) {
+							debugMsg("Found a CIDR match %v\n", cidrnet)
+							return stripZoneFromMask(k)
+						}
 					}
 				}
 			}
@@ -367,12 +373,11 @@ func getMatchingCIDR(remote string, zones map[string][]string) string {
 
 func (r *Resolver) getZones() map[string][]string {
 	result := map[string][]string{}
-	response, err := r.etcd.Get(r.etcdPrefix + "/zones", true, true)
+	response, err := r.etcd.Get(r.etcdPrefix+"/zones", true, true)
 	if err != nil {
 		return nil
 	}
 	for _, n := range response.Node.Nodes {
-		fmt.Println(n.Key, n.Value)
 		result[n.Key] = strings.Split(n.Value, ",")
 	}
 	return result
@@ -389,12 +394,12 @@ func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint1
 	if mask != "" {
 		debugMsg("Trying with mask: ", mask)
 		//		 Replace / with # since we can't store / via REST
-		key := strings.Replace(mask, "/", "-", 1) + nameToKey(name, "/." + typeStr)
+		key := mask + nameToKey(name, "/."+typeStr)
 		nodes, err = r.GetFromStorage(key)
 	}
 
 	if len(nodes) == 0 {
-		nodes, err = r.GetFromStorage(nameToKey(name, "/." + typeStr))
+		nodes, err = r.GetFromStorage(nameToKey(name, "/."+typeStr))
 	}
 
 	if err != nil && len(nodes) == 0 {
@@ -426,9 +431,8 @@ func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint1
 		answers = append(answers, answer)
 		if answer.Header().Rrtype == dns.TypeCNAME {
 
-
 			//			debugMsg("Found a CNAME answer will resolv that to an ip: ", answer.Header().Header().Name)
-			debugMsg("Found a CNAME answer will resolv that to an ip: ", node.node.Value, )
+			debugMsg("Found a CNAME answer will resolv that to an ip: ", node.node.Value)
 			ans, err := r.LookupAnswersForType(remote, node.node.Value, dns.TypeA)
 			debugMsg("Found a CNAME answer returned: ", ans)
 			if err != nil {

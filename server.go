@@ -56,6 +56,7 @@ func (h *Handler) Handle(response dns.ResponseWriter, req *dns.Msg) {
 			msg.Ns = []dns.RR{&dns.TXT{header, []string{"Rejected query based on matched filters"}}}
 		} else {
 			h.acceptCounter.Inc(1)
+
 			ip_addr := strings.Split(response.RemoteAddr().String(), ":")[0]
 			msg = h.resolver.Lookup(ip_addr, req)
 		}

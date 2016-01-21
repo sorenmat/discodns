@@ -14,7 +14,7 @@ var (
 
 func TestEtcd(t *testing.T) {
 	// Enable debug logging
-//	log_debug = true
+	log_debug = true
 
 	if !client.SyncCluster() {
 		t.Error("Failed to sync etcd cluster")
@@ -24,7 +24,7 @@ func TestEtcd(t *testing.T) {
 
 func TestGetFromStorageSingleKey(t *testing.T) {
 	resolver.etcdPrefix = "TestGetFromStorageSingleKey/"
-	client.Set("TestGetFromStorageSingleKey/net/disco/.A", "1.1.1.1", 0)
+	client.Set("TestGetFromStorageSingleKey/hosts/net/disco/.A", "1.1.1.1", 0)
 
 	nodes, err := resolver.GetFromStorage("net/disco/.A")
 	if err != nil {
@@ -46,9 +46,9 @@ func TestGetFromStorageSingleKey(t *testing.T) {
 
 func TestGetFromStorageNestedKeys(t *testing.T) {
 	resolver.etcdPrefix = "TestGetFromStorageNestedKeys/"
-	client.Set("TestGetFromStorageNestedKeys/net/disco/.A/0", "1.1.1.1", 0)
-	client.Set("TestGetFromStorageNestedKeys/net/disco/.A/1", "1.1.1.2", 0)
-	client.Set("TestGetFromStorageNestedKeys/net/disco/.A/2/0", "1.1.1.3", 0)
+	client.Set("TestGetFromStorageNestedKeys/hosts/net/disco/.A/0", "1.1.1.1", 0)
+	client.Set("TestGetFromStorageNestedKeys/hosts/net/disco/.A/1", "1.1.1.2", 0)
+	client.Set("TestGetFromStorageNestedKeys/hosts/net/disco/.A/2/0", "1.1.1.3", 0)
 
 	nodes, err := resolver.GetFromStorage("net/disco/.A")
 	if err != nil {
@@ -169,7 +169,7 @@ func TestAuthorityRoot(t *testing.T) {
 */
 func TestAuthorityDomain(t *testing.T) {
 	resolver.etcdPrefix = "TestAuthorityDomain/"
-	client.Set("TestAuthorityDomain/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestAuthorityDomain/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeA)
@@ -228,8 +228,8 @@ func TestAuthorityDomain(t *testing.T) {
 
 func TestAuthoritySubdomain(t *testing.T) {
 	resolver.etcdPrefix = "TestAuthoritySubdomain/"
-	client.Set("TestAuthoritySubdomain/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
-	client.Set("TestAuthoritySubdomain/net/disco/bar/.SOA", "ns1.bar.disco.net.\tbar.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestAuthoritySubdomain/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestAuthoritySubdomain/hosts/net/disco/bar/.SOA", "ns1.bar.disco.net.\tbar.disco.net.\t3600\t600\t86400\t10", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("foo.bar.disco.net.", dns.TypeA)
@@ -292,8 +292,8 @@ func TestAuthoritySubdomain(t *testing.T) {
 
 func TestAnswerQuestionA(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionA/"
-	client.Set("TestAnswerQuestionA/net/disco/bar/.A", "1.2.3.4", 0)
-	client.Set("TestAnswerQuestionA/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestAnswerQuestionA/hosts/net/disco/bar/.A", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionA/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeA)
@@ -332,8 +332,8 @@ func TestAnswerQuestionA(t *testing.T) {
 
 func TestAnswerQuestionAAAA(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionAAAA/"
-	client.Set("TestAnswerQuestionAAAA/net/disco/bar/.AAAA", "::1", 0)
-	client.Set("TestAnswerQuestionAAAA/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestAnswerQuestionAAAA/hosts/net/disco/bar/.AAAA", "::1", 0)
+	client.Set("TestAnswerQuestionAAAA/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeAAAA)
@@ -372,9 +372,9 @@ func TestAnswerQuestionAAAA(t *testing.T) {
 
 func TestAnswerQuestionANY(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionANY/"
-	client.Set("TestAnswerQuestionANY/net/disco/bar/.TXT", "google.com.", 0)
-	client.Set("TestAnswerQuestionANY/net/disco/bar/.A/0", "1.2.3.4", 0)
-	client.Set("TestAnswerQuestionANY/net/disco/bar/.A/1", "2.3.4.5", 0)
+	client.Set("TestAnswerQuestionANY/hosts/net/disco/bar/.TXT", "google.com.", 0)
+	client.Set("TestAnswerQuestionANY/hosts/net/disco/bar/.A/0", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionANY/hosts/net/disco/bar/.A/1", "2.3.4.5", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeANY)
@@ -419,8 +419,8 @@ func TestAnswerQuestionUnsupportedType(t *testing.T) {
 */
 func TestAnswerQuestionWildcardCNAME(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionCNAME/"
-	client.Set("TestAnswerQuestionCNAME/net/disco/*/.CNAME", "baz.disco.net.", 0)
-	client.Set("TestAnswerQuestionCNAME/net/disco/baz/.A", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionCNAME/hosts/net/disco/*/.CNAME", "baz.disco.net.", 0)
+	client.Set("TestAnswerQuestionCNAME/hosts/net/disco/baz/.A", "1.2.3.4", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("test.disco.net.", dns.TypeA)
@@ -459,8 +459,8 @@ func TestAnswerQuestionWildcardCNAME(t *testing.T) {
 
 func TestAnswerQuestionCNAME(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionCNAME/"
-	client.Set("TestAnswerQuestionCNAME/net/disco/bar/.CNAME", "baz.disco.net.", 0)
-	client.Set("TestAnswerQuestionCNAME/net/disco/baz/.A", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionCNAME/hosts/net/disco/bar/.CNAME", "baz.disco.net.", 0)
+	client.Set("TestAnswerQuestionCNAME/hosts/net/disco/baz/.A", "1.2.3.4", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeA)
@@ -499,7 +499,7 @@ func TestAnswerQuestionCNAME(t *testing.T) {
 
 func TestAnswerQuestionWildcardAAAANoMatch(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionWildcardANoMatch/"
-	client.Set("TestAnswerQuestionWildcardANoMatch/net/disco/bar/*/.AAAA", "::1", 0)
+	client.Set("TestAnswerQuestionWildcardANoMatch/hosts/net/disco/bar/*/.AAAA", "::1", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("bar.disco.net.", dns.TypeAAAA)
@@ -514,7 +514,7 @@ func TestAnswerQuestionWildcardAAAANoMatch(t *testing.T) {
 
 func TestAnswerQuestionWildcardAAAA(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionWildcardA/"
-	client.Set("TestAnswerQuestionWildcardA/net/disco/bar/*/.AAAA", "::1", 0)
+	client.Set("TestAnswerQuestionWildcardA/hosts/net/disco/bar/*/.AAAA", "::1", 0)
 
 	query := new(dns.Msg)
 	query.SetQuestion("baz.bar.disco.net.", dns.TypeAAAA)
@@ -553,8 +553,8 @@ func TestAnswerQuestionWildcardAAAA(t *testing.T) {
 
 func TestAnswerQuestionTTL(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTL/"
-	client.Set("TestAnswerQuestionTTL/net/disco/bar/.A", "1.2.3.4", 0)
-	client.Set("TestAnswerQuestionTTL/net/disco/bar/.A.ttl", "300", 0)
+	client.Set("TestAnswerQuestionTTL/hosts/net/disco/bar/.A", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionTTL/hosts/net/disco/bar/.A.ttl", "300", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeA)
 
@@ -586,10 +586,10 @@ func TestAnswerQuestionTTL(t *testing.T) {
 
 func TestAnswerQuestionTTLMultipleRecords(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTLMultipleRecords/"
-	client.Set("TestAnswerQuestionTTLMultipleRecords/net/disco/bar/.A/0", "1.2.3.4", 0)
-	client.Set("TestAnswerQuestionTTLMultipleRecords/net/disco/bar/.A/0.ttl", "300", 0)
-	client.Set("TestAnswerQuestionTTLMultipleRecords/net/disco/bar/.A/1", "8.8.8.8", 0)
-	client.Set("TestAnswerQuestionTTLMultipleRecords/net/disco/bar/.A/1.ttl", "600", 0)
+	client.Set("TestAnswerQuestionTTLMultipleRecords/hosts/net/disco/bar/.A/0", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionTTLMultipleRecords/hosts/net/disco/bar/.A/0.ttl", "300", 0)
+	client.Set("TestAnswerQuestionTTLMultipleRecords/hosts/net/disco/bar/.A/1", "8.8.8.8", 0)
+	client.Set("TestAnswerQuestionTTLMultipleRecords/hosts/net/disco/bar/.A/1.ttl", "600", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeA)
 
@@ -625,8 +625,8 @@ func TestAnswerQuestionTTLMultipleRecords(t *testing.T) {
 
 func TestAnswerQuestionTTLInvalidFormat(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTL/"
-	client.Set("TestAnswerQuestionTTL/net/disco/bar/.A", "1.2.3.4", 0)
-	client.Set("TestAnswerQuestionTTL/net/disco/bar/.A.ttl", "haha", 0)
+	client.Set("TestAnswerQuestionTTL/hosts/net/disco/bar/.A", "1.2.3.4", 0)
+	client.Set("TestAnswerQuestionTTL/hosts/net/disco/bar/.A.ttl", "haha", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeA)
 
@@ -658,7 +658,7 @@ func TestAnswerQuestionTTLInvalidFormat(t *testing.T) {
 
 func TestAnswerQuestionTTLDanglingNode(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTLDanglingNode/"
-	client.Set("TestAnswerQuestionTTLDanglingNode/net/disco/bar/.TXT.ttl", "600", 0)
+	client.Set("TestAnswerQuestionTTLDanglingNode/hosts/net/disco/bar/.TXT.ttl", "600", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeTXT)
 
@@ -670,7 +670,7 @@ func TestAnswerQuestionTTLDanglingNode(t *testing.T) {
 
 func TestAnswerQuestionTTLDanglingDirNode(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTLDanglingDirNode/"
-	client.Set("TestAnswerQuestionTTLDanglingDirNode/net/disco/bar/.TXT/0.ttl", "600", 0)
+	client.Set("TestAnswerQuestionTTLDanglingDirNode/hosts/net/disco/bar/.TXT/0.ttl", "600", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeTXT)
 
@@ -682,9 +682,9 @@ func TestAnswerQuestionTTLDanglingDirNode(t *testing.T) {
 
 func TestAnswerQuestionTTLDanglingDirSibling(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionTTLDanglingDirSibling/"
-	client.Set("TestAnswerQuestionTTLDanglingDirSibling/net/disco/bar/.TXT/0.ttl", "100", 0)
-	client.Set("TestAnswerQuestionTTLDanglingDirSibling/net/disco/bar/.TXT/1", "foo bar", 0)
-	client.Set("TestAnswerQuestionTTLDanglingDirSibling/net/disco/bar/.TXT/1.ttl", "600", 0)
+	client.Set("TestAnswerQuestionTTLDanglingDirSibling/hosts/net/disco/bar/.TXT/0.ttl", "100", 0)
+	client.Set("TestAnswerQuestionTTLDanglingDirSibling/hosts/net/disco/bar/.TXT/1", "foo bar", 0)
+	client.Set("TestAnswerQuestionTTLDanglingDirSibling/hosts/net/disco/bar/.TXT/1.ttl", "600", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeTXT)
 
@@ -721,7 +721,7 @@ func TestAnswerQuestionTTLDanglingDirSibling(t *testing.T) {
 
 func TestLookupAnswerForA(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForA/"
-	client.Set("TestLookupAnswerForA/net/disco/bar/.A", "1.2.3.4", 0)
+	client.Set("TestLookupAnswerForA/hosts/net/disco/bar/.A", "1.2.3.4", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeA)
 
@@ -749,7 +749,7 @@ func TestLookupAnswerForA(t *testing.T) {
 
 func TestLookupAnswerForAAAA(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForAAAA/"
-	client.Set("TestLookupAnswerForAAAA/net/disco/bar/.AAAA", "::1", 0)
+	client.Set("TestLookupAnswerForAAAA/hosts/net/disco/bar/.AAAA", "::1", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeAAAA)
 
@@ -777,7 +777,7 @@ func TestLookupAnswerForAAAA(t *testing.T) {
 
 func TestLookupAnswerForCNAME(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForCNAME/"
-	client.Set("TestLookupAnswerForCNAME/net/disco/bar/.CNAME", "cname.google.com.", 0)
+	client.Set("TestLookupAnswerForCNAME/hosts/net/disco/bar/.CNAME", "cname.google.com.", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeCNAME)
 
@@ -805,7 +805,7 @@ func TestLookupAnswerForCNAME(t *testing.T) {
 
 func TestLookupAnswerForNS(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForNS/"
-	client.Set("TestLookupAnswerForNS/net/disco/bar/.NS", "dns.google.com.", 0)
+	client.Set("TestLookupAnswerForNS/hosts/net/disco/bar/.NS", "dns.google.com.", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "bar.disco.net.", dns.TypeNS)
 
@@ -833,7 +833,7 @@ func TestLookupAnswerForNS(t *testing.T) {
 
 func TestLookupAnswerForSOA(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForSOA/"
-	client.Set("TestLookupAnswerForSOA/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	client.Set("TestLookupAnswerForSOA/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "disco.net.", dns.TypeSOA)
 
@@ -884,8 +884,8 @@ func TestLookupAnswerForSOA(t *testing.T) {
 func TestLookupAnswerForPTR(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForPTR/"
 
-	client.Set("TestLookupAnswerForPTR/net/disco/alias/.PTR/target1", "target1.disco.net.", 0)
-	client.Set("TestLookupAnswerForPTR/net/disco/alias/.PTR/target2", "target2.disco.net.", 0)
+	client.Set("TestLookupAnswerForPTR/hosts/net/disco/alias/.PTR/target1", "target1.disco.net.", 0)
+	client.Set("TestLookupAnswerForPTR/hosts/net/disco/alias/.PTR/target2", "target2.disco.net.", 0)
 
 	records, _ := resolver.LookupAnswersForType("127.0.0.1", "alias.disco.net.", dns.TypePTR)
 
@@ -928,7 +928,7 @@ func TestLookupAnswerForPTR(t *testing.T) {
 func TestLookupAnswerForPTRInvalidDomain(t *testing.T) {
 	resolver.etcdPrefix = "TestLookupAnswerForPTRInvalidDomain/"
 
-	client.Set("TestLookupAnswerForPTRInvalidDomain/net/disco/bad-alias/.PTR", "...", 0)
+	client.Set("TestLookupAnswerForPTRInvalidDomain/hosts/net/disco/bad-alias/.PTR", "...", 0)
 
 	records, err := resolver.LookupAnswersForType("127.0.0.1", "bad-alias.disco.net.", dns.TypePTR)
 
@@ -946,7 +946,7 @@ func TestLookupAnswerForPTRInvalidDomain(t *testing.T) {
 func TestLookupAnswerForSRV(t *testing.T) {
 
 	resolver.etcdPrefix = "TestLookupAnswerForSRV/"
-	client.Set("TestLookupAnswerForSRV/net/disco/_tcp/_http/.SRV",
+	client.Set("TestLookupAnswerForSRV/hosts/net/disco/_tcp/_http/.SRV",
 		"100\t100\t80\tsome-webserver.disco.net",
 		0)
 
@@ -992,7 +992,7 @@ func TestLookupAnswerForSRVInvalidValues(t *testing.T) {
 
 	for name, value := range bad_vals_map {
 
-		client.Set("TestLookupAnswerForSRVInvalidValues/net/disco/"+name+"/.SRV", value, 0)
+		client.Set("TestLookupAnswerForSRVInvalidValues/hosts/net/disco/"+name+"/.SRV", value, 0)
 		records, err := resolver.LookupAnswersForType("127.0.0.1", name+".disco.net.", dns.TypeSRV)
 
 		if len(records) > 0 {
@@ -1047,7 +1047,13 @@ func TestCIDRMasksWithNilMask(t *testing.T) {
 }
 
 func TestGetZones(t *testing.T) {
-	client   = etcd.NewClient([]string{"http://127.0.0.1:4001"})
+	client = etcd.NewClient([]string{"http://127.0.0.1:4001"})
 	resolver = &Resolver{etcd: client}
 	resolver.getZones()
+}
+
+func TestStripZone(t *testing.T) {
+	if stripZoneFromMask("/zones/public") != "/public" {
+		t.Error("Error stripping /zones from mask")
+	}
 }
