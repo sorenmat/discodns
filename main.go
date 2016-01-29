@@ -24,7 +24,7 @@ var (
 		ListenPort       int      `short:"p" long:"port" description:"Port to listen on" default:"53"`
 		EtcdHosts        []string `short:"e" long:"etcd" description:"host:port[,host:port] for etcd hosts" default:"127.0.0.1:4001"`
 		Debug            bool     `short:"v" long:"debug" description:"Enable debug logging"`
-		MetricsDuration  int      `short:"m" long:"metrics" description:"Dump metrics to stderr every N seconds" default:"30"`
+		MetricsDuration  int      `short:"m" long:"metrics" description:"Dump metrics to stderr every N seconds" default:"-1"`
 		GraphiteServer   string   `long:"graphite" description:"Graphite server to send metrics to"`
 		GraphiteDuration int      `long:"graphite-duration" description:"Duration to periodically send metrics to the graphite server" default:"10"`
 		DefaultTtl       uint32   `short:"t" long:"default-ttl" description:"Default TTL to return on records without an explicit TTL" default:"300"`

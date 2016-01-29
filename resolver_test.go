@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 	"strings"
@@ -103,70 +104,68 @@ func TestNameToKeyConverter(t *testing.T) {
  * Test that the right authority is being returned for different types of DNS
  * queries.
  */
-/*
 func TestAuthorityRoot(t *testing.T) {
-    resolver.etcdPrefix = "TestAuthorityRoot/"
-    client.Set("TestAuthorityRoot/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
+	resolver.etcdPrefix = "TestAuthorityRoot/"
+	client.Set("TestAuthorityRoot/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
 
-    query := new(dns.Msg)
-    query.SetQuestion("disco.net.", dns.TypeA)
+	query := new(dns.Msg)
+	query.SetQuestion("disco.net.", dns.TypeA)
 
-    answer := resolver.Lookup("127.0.0.1", query)
+	answer := resolver.Lookup("127.0.0.1", query)
 
-    if len(answer.Answer) > 0 {
-        fmt.Println(answer.Answer)
-        t.Error("Expected zero answers")
-        t.Fatal()
-    }
+	if len(answer.Answer) > 0 {
+		t.Error("Expected zero answers")
+		t.Fatal()
+	}
 
-    if len(answer.Ns) != 1 {
-        t.Error("Expected one authority record")
-        t.Fatal()
-    }
+	if len(answer.Ns) != 1 {
+		t.Error("Expected one authority record: ", answer)
+		t.Fatal()
+	}
 
-    rr := answer.Ns[0].(*dns.SOA)
-    header := rr.Header()
+	rr := answer.Ns[0].(*dns.SOA)
+	header := rr.Header()
 
-    // Verify the header is correct
-    if header.Name != "disco.net." {
-        t.Error("Expected record with name disco.net.: ", header.Name)
-        t.Fatal()
-    }
-    if header.Rrtype != dns.TypeSOA {
-        t.Error("Expected record with type SOA:", header.Rrtype)
-        t.Fatal()
-    }
+	// Verify the header is correct
+	if header.Name != "disco.net." {
+		t.Error("Expected record with name disco.net.: ", header.Name)
+		t.Fatal()
+	}
+	if header.Rrtype != dns.TypeSOA {
+		t.Error("Expected record with type SOA:", header.Rrtype)
+		t.Fatal()
+	}
 
-    // Verify the record itself is correct
-    if rr.Ns != "ns1.disco.net." {
-        t.Error("Expected NS to be ns1.disco.net.: ", rr.Ns)
-        t.Fatal()
-    }
-    if rr.Mbox != "admin.disco.net." {
-        t.Error("Expected MBOX to be admin.disco.net.: ", rr.Mbox)
-        t.Fatal()
-    }
-    // if rr.Serial != "admin.disco.net" {
-    //     t.Error("Expected MBOX to be admin.disco.net: ", rr.Mbox)
-    // }
-    if rr.Refresh != 3600 {
-        t.Error("Expected REFRESH to be 3600: ", rr.Refresh)
-        t.Fatal()
-    }
-    if rr.Retry != 600 {
-        t.Error("Expected RETRY to be 600: ", rr.Retry)
-        t.Fatal()
-    }
-    if rr.Expire != 86400 {
-        t.Error("Expected EXPIRE to be 86400: ", rr.Expire)
-        t.Fatal()
-    }
-    if rr.Minttl != 10 {
-        t.Error("Expected MINTTL to be 10: ", rr.Minttl)
-        t.Fatal()
-    }
+	// Verify the record itself is correct
+	if rr.Ns != "ns1.disco.net." {
+		t.Error("Expected NS to be ns1.disco.net.: ", rr.Ns)
+		t.Fatal()
+	}
+	if rr.Mbox != "admin.disco.net." {
+		t.Error("Expected MBOX to be admin.disco.net.: ", rr.Mbox)
+		t.Fatal()
+	}
+	// if rr.Serial != "admin.disco.net" {
+	//     t.Error("Expected MBOX to be admin.disco.net: ", rr.Mbox)
+	// }
+	if rr.Refresh != 3600 {
+		t.Error("Expected REFRESH to be 3600: ", rr.Refresh)
+		t.Fatal()
+	}
+	if rr.Retry != 600 {
+		t.Error("Expected RETRY to be 600: ", rr.Retry)
+		t.Fatal()
+	}
+	if rr.Expire != 86400 {
+		t.Error("Expected EXPIRE to be 86400: ", rr.Expire)
+		t.Fatal()
+	}
+	if rr.Minttl != 10 {
+		t.Error("Expected MINTTL to be 10: ", rr.Minttl)
+		t.Fatal()
+	}
 }
-*/
+
 func TestAuthorityDomain(t *testing.T) {
 	resolver.etcdPrefix = "TestAuthorityDomain/"
 	client.Set("TestAuthorityDomain/hosts/net/disco/.SOA", "ns1.disco.net.\tadmin.disco.net.\t3600\t600\t86400\t10", 0)
@@ -392,7 +391,6 @@ func TestAnswerQuestionANY(t *testing.T) {
 	}
 }
 
-/*
 func TestAnswerQuestionUnsupportedType(t *testing.T) {
 	// query for a type that we don't have support for (I tried to pick the most
 	// obscure rr type that the dns library supports and that we're unlikely to
@@ -416,7 +414,7 @@ func TestAnswerQuestionUnsupportedType(t *testing.T) {
 		t.Error("Didn't expect any authority records")
 	}
 }
-*/
+
 func TestAnswerQuestionWildcardCNAME(t *testing.T) {
 	resolver.etcdPrefix = "TestAnswerQuestionCNAME/"
 	client.Set("TestAnswerQuestionCNAME/hosts/net/disco/*/.CNAME", "baz.disco.net.", 0)
@@ -427,7 +425,7 @@ func TestAnswerQuestionWildcardCNAME(t *testing.T) {
 
 	answer := resolver.Lookup("127.0.0.1", query)
 
-	if len(answer.Answer) != 1 {
+	if len(answer.Answer) != 2 {
 		t.Error("Expected one answers, got ", len(answer.Answer))
 		t.Fatal()
 	}
@@ -443,6 +441,7 @@ func TestAnswerQuestionWildcardCNAME(t *testing.T) {
 	// Verify the header is correct
 	if header.Name != "test.disco.net." {
 		t.Error("Expected record with name test.disco.net.: ", header.Name)
+		t.Error("Expected record: ", rr)
 		t.Fatal()
 	}
 	if header.Rrtype != dns.TypeCNAME {

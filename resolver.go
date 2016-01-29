@@ -258,6 +258,7 @@ func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan d
 
 	debugMsg("Answering question ", q)
 
+
 	if q.Qtype == dns.TypeANY {
 		wg := sync.WaitGroup{}
 		wg.Add(len(converters))
@@ -287,6 +288,7 @@ func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan d
 				close(answers)
 				close(errors)
 			}()
+
 			records, err := r.LookupAnswersForType(remote, q.Name, q.Qtype)
 			if err != nil {
 				errors <- err
@@ -296,7 +298,8 @@ func (r *Resolver) AnswerQuestion(remote string, q dns.Question) (answers chan d
 						answers <- rr
 					}
 				} else {
-					cnames, err := r.LookupAnswersForType(remote, q.Name, dns.TypeCNAME)
+					// We might have been looking for an A record but we only have a CNAME with that name
+					cnames, err := r.lookupAnswersForType(remote, q.Name, dns.TypeCNAME, dns.TypeA)
 					for _, n := range cnames {
 						answers <- n
 					}
@@ -384,12 +387,16 @@ func (r *Resolver) getZones() map[string][]string {
 }
 
 func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint16) (answers []dns.RR, errs error) {
+	return r.lookupAnswersForType(remote, name, rrType, dns.TypeNone)
+}
+
+func (r *Resolver) lookupAnswersForType(remote string, name string, rrType uint16, typeWeWanted uint16) (answers []dns.RR, errs error) {
 	var nodes []*EtcdRecord
 	var err error
 	name = strings.ToLower(name)
 
 	typeStr := dns.TypeToString[rrType]
-	debugMsg("LookupAnswersForType typeStr: ", typeStr)
+
 	mask := getMatchingCIDR(remote, r.getZones())
 	if mask != "" {
 		debugMsg("Trying with mask: ", mask)
@@ -404,21 +411,16 @@ func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint1
 
 	if err != nil && len(nodes) == 0 {
 		debugMsg("Trying local query: " + string(len(nodes)))
-		debugMsg("Trying local query")
-		message, localerr := localQuery(name, rrType)
-		if localerr != nil {
-			if e, ok := localerr.(*etcd.EtcdError); ok {
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
 					return answers, nil
 				}
 			}
 			return
-
-		}
-		for _, a := range message.Answer {
-			answers = append(answers, a)
 		}
 	}
+
 	for _, node := range nodes {
 
 		header := dns.RR_Header{Name: name, Class: dns.ClassINET, Rrtype: rrType, Ttl: node.ttl}
@@ -428,12 +430,14 @@ func (r *Resolver) LookupAnswersForType(remote string, name string, rrType uint1
 			debugMsg("Error converting type: ", err)
 			return nil, err
 		}
+
 		answers = append(answers, answer)
-		if answer.Header().Rrtype == dns.TypeCNAME {
+
+		if answer.Header().Rrtype == dns.TypeCNAME && typeWeWanted == dns.TypeA {
 
 			//			debugMsg("Found a CNAME answer will resolv that to an ip: ", answer.Header().Header().Name)
 			debugMsg("Found a CNAME answer will resolv that to an ip: ", node.node.Value)
-			ans, err := r.LookupAnswersForType(remote, node.node.Value, dns.TypeA)
+			ans, err := r.lookupAnswersForType(remote, node.node.Value, dns.TypeA, typeWeWanted)
 			debugMsg("Found a CNAME answer returned: ", ans)
 			if err != nil {
 				debugMsg("ERROR: ", err)
