@@ -30,11 +30,11 @@ var (
 		DefaultTtl       uint32   `short:"t" long:"default-ttl" description:"Default TTL to return on records without an explicit TTL" default:"300"`
 		Accept           []string `long:"accept" description:"Limit DNS queries to a set of domain:[type,...] pairs"`
 		Reject           []string `long:"reject" description:"Limit DNS queries to a set of domain:[type,...] pairs"`
+		DNSPrefix        string   `long:"ndsprefix" description:"dnsprefix prefix for the dns entries in etcd" default:""`
 	}
 )
 
 func main() {
-
 	_, err := flags.ParseArgs(&Options, os.Args[1:])
 	if err != nil {
 		os.Exit(1)
